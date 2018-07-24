@@ -13,7 +13,8 @@ Output example
 
 .. code-block:: bash
 
-  ./cpplint.py test.cpp test2.cpp test3.h 
+  ./cpplint.py test.cpp test2.cpp test3.h
+  
   test.cpp:5:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
 
   test.cpp:8:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
@@ -58,4 +59,6 @@ Output example
   test3.h:10:  operation within assert will be ignored in release mode  [c++/assert] [4]
 
   Done processing test3.h
+  
+  
   Total errors found: 19
