@@ -41,6 +41,7 @@ We do a small hack, which is to ignore //'s with "'s after them on the
 same line, but it is far from perfect (in either direction).
 """
 
+from __future__ import with_statement
 import codecs
 import copy
 import getopt
@@ -290,6 +291,20 @@ _ERROR_CATEGORIES = [
     'build/namespaces',
     'build/printf_format',
     'build/storage_class',
+    'c++11/boost',
+    'c++11/keyword',
+    'c++11/noexcept',
+    'c++11/constexpr',
+    'c++11/shared_ptr',
+    'c++11/lambda',
+    'c++11/emplace',
+    'c++11/mutable_mutex',
+    'c++11/nullptr',
+    'c++11/type_alias',
+    'c++11/enum',
+    'c++11/delete',
+    'c++/namespace',
+    'c++/assert',
     'legal/copyright',
     'readability/alt_tokens',
     'readability/braces',
@@ -5520,15 +5535,12 @@ _HEADERS_CONTAINING_TEMPLATES = (
     ('<limits>', ('numeric_limits',)),
     ('<list>', ('list',)),
     ('<map>', ('map', 'multimap',)),
-    ('<memory>', ('allocator', 'make_shared', 'make_unique', 'shared_ptr',
-                  'unique_ptr', 'weak_ptr')),
+    ('<memory>', ('allocator',)),
     ('<queue>', ('queue', 'priority_queue',)),
     ('<set>', ('set', 'multiset',)),
     ('<stack>', ('stack',)),
     ('<string>', ('char_traits', 'basic_string',)),
     ('<tuple>', ('tuple',)),
-    ('<unordered_map>', ('unordered_map', 'unordered_multimap')),
-    ('<unordered_set>', ('unordered_set', 'unordered_multiset')),
     ('<utility>', ('pair',)),
     ('<vector>', ('vector',)),
 
@@ -5543,7 +5555,7 @@ _HEADERS_MAYBE_TEMPLATES = (
     ('<algorithm>', ('copy', 'max', 'min', 'min_element', 'sort',
                      'transform',
                     )),
-    ('<utility>', ('forward', 'make_pair', 'move', 'swap')),
+    ('<utility>', ('swap',)),
     )
 
 _RE_PATTERN_STRING = re.compile(r'\bstring\b')
@@ -5697,13 +5709,8 @@ def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
       continue
 
     for pattern, template, header in _re_pattern_templates:
-      matched = pattern.search(line)
-      if matched:
-        # Don't warn about IWYU in non-STL namespaces:
-        # (We check only the first match per line; good enough.)
-        prefix = line[:matched.start()]
-        if prefix.endswith('std::') or not prefix.endswith('::'):
-          required[header] = (linenum, template)
+      if pattern.search(line):
+        required[header] = (linenum, template)
 
   # The policy is that if you #include something in foo.h you don't need to
   # include it again in foo.cc. Here, we will look at possible includes.
@@ -5872,7 +5879,6 @@ def CheckRedundantOverrideOrFinal(filename, clean_lines, linenum, error):
 
 
 
-
 # Returns true if we are at a new block, and it is directly
 # inside of a namespace.
 def IsBlockInNameSpace(nesting_state, is_forward_declaration):
@@ -5976,9 +5982,272 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   CheckMakePairUsesDeduction(filename, clean_lines, line, error)
   CheckRedundantVirtual(filename, clean_lines, line, error)
   CheckRedundantOverrideOrFinal(filename, clean_lines, line, error)
+
+  ########################################################
+
+  CheckCpp11Keywords(filename, clean_lines, line, error)
+
+  CheckPrivateMemfun(filename, clean_lines, line, nesting_state, error)
+  CheckNamespaceUsing(filename, file_extension, clean_lines, line, error)
+  CheckAssertSideEffect(filename, clean_lines, line, error)
+  ########################################################
+
   if extra_check_functions:
     for check_fn in extra_check_functions:
       check_fn(filename, clean_lines, line, error)
+
+def CheckAssertSideEffect(filename, clean_lines, linenum, error):
+    """ avoid assert side effect
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+
+    line = clean_lines.elided[linenum]
+    match = Search("assert", line)
+    if match:
+        error(filename, linenum, 'c++/assert', 4, ('operation within assert will be ignored in release mode'))
+
+
+def CheckNamespaceUsing(filename, file_extension, clean_lines, linenum, error):
+    """'using namespace XXX' is forbidden in header file
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+
+    if file_extension not in GetHeaderExtensions():
+        return
+
+    line = clean_lines.elided[linenum]
+    match = Search("using namespace ", line)
+    if match:
+        error(filename, linenum, 'c++/namespace', 5, ('do not import namespace in header file'))
+
+
+def CheckCpp11Keywords(filename, clean_lines, linenum, error):
+  CheckNull(filename, clean_lines, linenum, error)
+  CheckTypedef(filename, clean_lines, linenum, error)
+  CheckBoostUsage(filename, clean_lines, linenum, error)
+  CheckScopedEnum(filename, clean_lines, linenum, error)
+  CheckNoexcept(filename, clean_lines, linenum, error)
+  CheckInlineConstexpr(filename, clean_lines, linenum, error)
+  CheckSmartPtr(filename, clean_lines, linenum, error)
+  CheckBind(filename, clean_lines, linenum, error)
+  CheckEmplace(filename, clean_lines, linenum, error)
+  CheckMutex(filename, clean_lines, linenum, error)
+
+
+def CheckMutex(filename, clean_lines, linenum, error):
+    """check if mutable used with mutex
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = (Search("mutex ", line) or Search("std::mutex ", line)) and not Search("mutable", line)
+    if match:
+        error(filename, linenum, 'c++11/mutable_mutex', 5, ('use mutable together with mutex'))
+
+def CheckEmplace(filename, clean_lines, linenum, error):
+    """check if emplace used instread of push_back/insert
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search("push_back\(", line) or Search("insert\(", line) or Search("push\(", line)
+    if match:
+        error(filename, linenum, 'c++11/emplace', 4,
+              ('consider using emplace* method instead of push(|_back)/insert for STL containers'))
+
+def CheckBind(filename, clean_lines, linenum, error):
+    """check if lambda used instead of std::bind
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search("bind\(", line) or Search("bind \(", line)
+    if match:
+        error(filename, linenum, 'c++11/lambda', 4, ('use lambda instead of bind'))
+
+def CheckSmartPtr(filename, clean_lines, linenum, error):
+    """check if make_shared is used to create shared_ptr
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match_ptr = Search("shared_ptr", line)
+    match_new = Search("new", line)
+    if match_ptr and match_new:
+        error(filename, linenum, 'c++11/shared_ptr', 4,
+              ('use make_shared instead of new'))
+    if match_ptr:
+        error(filename, linenum, 'c++11/shared_ptr', 3,
+              ('consider unique_ptr instead of shared_ptr'))
+
+
+def CheckInlineConstexpr(filename, clean_lines, linenum, error):
+    """if function has inline modifier, it should be replaced by constexpr
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search("inline", line) or Search("inline ", line)
+    if match:
+        error(filename, linenum, 'c++11/constexpr', 5,
+              ('use constexpr instead of inline'))
+
+def CheckNoexcept(filename, clean_lines, linenum, error):
+    """Check if function throws no exception, not using noexcept
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search("throw()", line) or Search("throw ()", line)
+    if match:
+        error(filename, linenum, 'c++11/noexcept', 5,
+              ('use noexcept to indicate function throw no exception'))
+
+
+def CheckNull(filename, clean_lines, linenum, error):
+    """Check if line contains a "NULL" keyword.
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search(r'\b(NULL)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/nullptr', 5,
+              ('"NULL" should be replaced by nullptr'))
+
+def CheckBoostUsage(filename, clean_lines, linenum, error):
+    """Check if line contains boost usage that has alternatives in c++ 11
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search(r'\b(boost::mutex)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/boost', 5,
+              ('"boost::mutex" should be replaced by std::mutex'))
+    match = Search(r'\b(boost::thread)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/boost', 5,
+              ('"boost::thread" should be replaced by std::thread'))
+    match = Search(r'\b(boost::lock_guard)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/boost', 5,
+              ('"boost::lock_guard" should be replaced by std::lock_guard'))
+
+def CheckTypedef(filename, clean_lines, linenum, error):
+    """Check if line contains a "typedef" :keyword.
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search(r'\b(typedef)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/type_alias', 5,
+              ('"typedef" should be replaced by "using"'))
+
+def CheckScopedEnum(filename, clean_lines, linenum, error):
+    """Check if line contains a "enum" :keyword.
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    match = Search(r'\b(enum|enum )\b', line) and not Search(r'\b(enum class)\b', line)
+    if match:
+        error(filename, linenum, 'c++11/enum', 5,
+              ('"enum" should be replaced by scoped enum "enum class"'))
+
+def CheckPrivateMemfun(filename, clean_lines, linenum, nesting_state, error):
+    """Check if line contains private not defined member function :keyword.
+
+    Args:
+      filename: The name of the current file.
+      clean_lines: A CleansedLines instance containing the file.
+      linenum: The number of the line to check.
+      nesting_state: A NestingState instance which maintains information about
+                     the current stack of nested blocks being parsed.
+      error: The function to call with any errors found.
+    """
+    line = clean_lines.elided[linenum]
+    # in class/struct
+    #if self.stack and isinstance(self.stack[-1], _ClassInfo):
+    #    classinfo = self.stack[-1]
+    classinfo = nesting_state.InnermostClass()
+    if not classinfo:
+        return
+
+    # The class may have been declared with namespace or classname qualifiers.
+    # The constructor and destructor will not have those qualifiers.
+    base_classname = classinfo.name.split('::')[-1]
+    name_1 = base_classname + " \("
+    name_2 = base_classname + "\("
+
+    # Scan current and next line for '{' to
+
+    no_def = True
+    for i in xrange(linenum, linenum + 1):
+        l = clean_lines.elided[i]
+        if Search("{", l):
+            no_def = False
+            break
+
+    matched1 = Search(name_1, line)
+    matched2 = Search(name_2, line)
+    matched = matched1 or matched2
+    if no_def and matched and classinfo.access == 'private':
+        error(filename, linenum, 'c++11/delete', 4, '"delete" should be used for non-defined private ctor/dtor/assignment')
+
+
+
 
 def FlagCxx11Features(filename, clean_lines, linenum, error):
   """Flag those c++11 features that we only allow in certain places.
