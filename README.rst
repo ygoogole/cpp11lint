@@ -1,78 +1,41 @@
-cpplint - static code checker for C++
+cpp11lint - improved google cpplint supporting C++11 features and idioms.
 =====================================
 
-This project continues the work of cpplint, a C++ style checker following `Google's C++ style guide <http://google.github.io/styleguide/cppguide.html>`_. It provides cpplint as a PyPI package and adds a few features and fixes. It is maintained as a fork of `google/styleguide <https://github.com/google/styleguide>`_ in hopes that it can be merged in the future.
-
-To install cpplint from PyPI, run:
-
-.. code-block:: bash
-
-    $ pip install cpplint
-
-Then run it with:
-
-.. code-block:: bash
-
-    $ cpplint [OPTIONS] files
-
-For full usage instructions, run:
-
-.. code-block:: bash
-
-    $ cpplint --help
-
-Changes
+Details of new files:
 -------
 
-The modifications in this branch are minor fixes and cosmetic changes:
+* CPPLINT.cfg - default configuration which turns off most cpplint checking (with cpp11 check on)
+* Sample code as input of cpp11lint - test.cpp test2.cpp test3.h
 
-* more default extensions
-* python 3 compatibility
-* customizable file extensions with the --extensions and --headers arguments
-* continuous integration on travis
-* support for recursive file discovery via the --recursive argument
-* support for excluding files via --exclude
-* JUnit XML output format
-* Overriding repository root auto-detection via --repository
-* Support ``#pragma once`` as an alternative to header include guards
-* Add quiet option to suppress non error-related output
 
-Maintaining
+Output example
 -----------
 
-To release a new version:
-
 .. code-block:: bash
 
-    vi setup.py # increment the version
-    vi changelog.rst # log changes
-    git add setup.py changelog.rst
-    git commit -m "Releasing 0.0.6"
-    git tag 0.0.6
-    git push
-    git push --tags
-    python setup.py sdist register -r pypi
-    python setup.py sdist upload -r pypi
+$ ./cpplint.py test.cpp test2.cpp test3.h 
+test.cpp:5:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
 
-To incorporate google's changes:
+test.cpp:8:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
 
-.. code-block:: bash
-
-    git fetch google gh-pages
-    git checkout -b updates FETCH_HEAD
-    git rebase master
-    git push -u origin updates
-    # check travis
-    git push origin --delete updates
-
-    git rebase updates master
-    git branch -D updates
-    git push
-
-Thanks to `tkruse <https://github.com/tkruse>`_ for putting cpplint on PyPI and maintaining the PyPI version for many years!
-
-.. image:: https://travis-ci.org/theandrewdavis/cpplint.svg
-    :target: https://travis-ci.org/theandrewdavis/cpplint
-
-.. image:: https://img.shields.io/pypi/v/cpplint.svg
-    :target: https://pypi.python.org/pypi/cpplint
+test.cpp:24:  "NULL" should be replaced by nullptr  [c++11/nullptr] [5]
+test.cpp:25:  "boost::mutex" should be replaced by std::mutex  [c++11/boost] [5]
+test.cpp:25:  use mutable together with mutex  [c++11/mutable_mutex] [5]
+test.cpp:26:  "boost::thread" should be replaced by std::thread  [c++11/boost] [5]
+test.cpp:27:  "boost::lock_guard" should be replaced by std::lock_guard  [c++11/boost] [5]
+test.cpp:28:  "typedef" should be replaced by "using"  [c++11/type_alias] [5]
+test.cpp:29:  "enum" should be replaced by scoped enum "enum class"  [c++11/enum] [5]
+test.cpp:39:  consider unique_ptr instead of shared_ptr  [c++11/shared_ptr] [3]
+Done processing test.cpp
+test2.cpp:5:  use constexpr instead of inline  [c++11/constexpr] [5]
+test2.cpp:5:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
+test2.cpp:8:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
+test2.cpp:21:  use noexcept to indicate function throw no exception  [c++11/noexcept] [5]
+test2.cpp:22:  use noexcept to indicate function throw no exception  [c++11/noexcept] [5]
+test2.cpp:23:  use lambda instead of bind  [c++11/lambda] [4]
+test2.cpp:25:  consider using emplace* method instead of push(|_back)/insert for STL containers  [c++11/emplace] [4]
+Done processing test2.cpp
+test3.h:1:  do not import namespace in header file  [c++/namespace] [5]
+test3.h:10:  operation within assert will be ignored in release mode  [c++/assert] [4]
+Done processing test3.h
+Total errors found: 19
