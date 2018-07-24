@@ -1,5 +1,6 @@
-cpp11lint - improved google cpplint supporting C++11 features and idioms.
+cpp11lint
 =====================================
+improved google cpplint supporting C++11 features and idioms.
 
 Details of new files:
 -------
