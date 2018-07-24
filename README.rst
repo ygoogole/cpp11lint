@@ -7,7 +7,7 @@ Details of new files:
 
 * CPPLINT.cfg - default configuration which turns off most cpplint checking (with cpp11 check on)
 * Sample code as input of cpp11lint - test.cpp test2.cpp test3.h
-
+* cpplint.py - main checker logic
 
 Output example
 -----------
