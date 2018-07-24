@@ -13,10 +13,10 @@ Output example
 
 .. code-block:: bash
 
-$ ./cpplint.py test.cpp test2.cpp test3.h 
-test.cpp:5:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
+  ./cpplint.py test.cpp test2.cpp test3.h 
+  test.cpp:5:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
 
-test.cpp:8:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
+  test.cpp:8:  "delete" should be used for non-defined private ctor/dtor/assignment  [c++11/delete] [4]
 
 test.cpp:24:  "NULL" should be replaced by nullptr  [c++11/nullptr] [5]
 test.cpp:25:  "boost::mutex" should be replaced by std::mutex  [c++11/boost] [5]
